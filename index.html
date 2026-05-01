@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Schnitzeljagd Barcelona</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+–orange: #E85D2F;
+–orange-light: #FBE9E3;
+–orange-dark: #B54422;
+–green: #2D7A4F;
+–green-light: #E3F4EB;
+–bg: #F7F4EF;
+–surface: #FFFFFF;
+–text: #1A1916;
+–text-2: #5C5A55;
+–text-3: #9C9A95;
+–border: #E8E5DF;
+–radius: 16px;
+–radius-sm: 10px;
+}
+
+html, body {
+height: 100%;
+overflow: hidden;
+font-family: ‘DM Sans’, sans-serif;
+background: var(–bg);
+color: var(–text);
+-webkit-font-smoothing: antialiased;
+}
+
+/* ── SCREENS ─────────────────────────────── */
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(–bg); transition: transform 0.35s cubic-bezier(.4,0,.2,1), opacity 0.35s; }
+.screen.hidden { transform: translateY(100%); opacity: 0; pointer-events: none; }
+
+/* ── SPLASH ──────────────────────────────── */
+#splash {
+align-items: center;
+justify-content: center;
+background: var(–orange);
+gap: 0;
+}
+.splash-emoji { font-size: 64px; margin-bottom: 1.5rem; animation: bounce 2s infinite; }
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.splash-title { font-size: 32px; font-weight: 600; color: #fff; text-align: center; line-height: 1.1; margin-bottom: 8px; }
+.splash-sub { font-size: 15px; color: rgba(255,255,255,0.75); margin-bottom: 3rem; }
+.splash-btn {
+background: #fff;
+color: var(–orange);
+border: none;
+border-radius: 100px;
+padding: 16px 40px;
+font-size: 16px;
+font-weight: 600;
+font-family: ‘DM Sans’, sans-serif;
+cursor: pointer;
+box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+transition: transform 0.15s, box-shadow 0.15s;
+}
+.splash-btn:active { transform: scale(0.97); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+
+/* ── NAME ENTRY ──────────────────────────── */
+#namescreen {
+align-items: center;
+justify-content: center;
+padding: 2rem;
+gap: 1.5rem;
+background: var(–bg);
+}
+.name-icon { font-size: 48px; }
+.name-title { font-size: 22px; font-weight: 600; text-align: center; }
+.name-sub { font-size: 14px; color: var(–text-2); text-align: center; }
+.name-input {
+width: 100%;
+max-width: 300px;
+padding: 14px 18px;
+border-radius: var(–radius-sm);
+border: 2px solid var(–border);
+font-size: 17px;
+font-family: ‘DM Sans’, sans-serif;
+background: var(–surface);
+color: var(–text);
+outline: none;
+transition: border-color 0.2s;
+}
+.name-input:focus { border-color: var(–orange); }
+.btn-primary {
+background: var(–orange);
+color: #fff;
+border: none;
+border-radius: 100px;
+padding: 15px 36px;
+font-size: 16px;
+font-weight: 600;
+font-family: ‘DM Sans’, sans-serif;
+cursor: pointer;
+transition: transform 0.15s, background 0.15s;
+width: 100%;
+max-width: 300px;
+}
+.btn-primary:active { transform: scale(0.98); background: var(–orange-dark); }
+.btn-primary:disabled { background: var(–border); color: var(–text-3); }
+
+/* ── MAIN APP ────────────────────────────── */
+#mainapp { flex-direction: column; }
+
+/* Top bar */
+.topbar {
+display: flex;
+align-items: center;
+padding: 12px 16px;
+background: var(–surface);
+border-bottom: 1px solid var(–border);
+gap: 10px;
+flex-shrink: 0;
+z-index: 10;
+}
+.topbar-player {
+display: flex;
+align-items: center;
+gap: 8px;
+flex: 1;
+}
+.player-avatar {
+width: 32px; height: 32px;
+border-radius: 50%;
+background: var(–orange);
+display: flex; align-items: center; justify-content: center;
+font-size: 13px; font-weight: 600; color: #fff;
+flex-shrink: 0;
+}
+.player-name { font-size: 14px; font-weight: 500; }
+.score-pill {
+background: var(–orange-light);
+color: var(–orange-dark);
+font-size: 13px; font-weight: 600;
+padding: 4px 10px;
+border-radius: 100px;
+font-family: ‘DM Mono’, monospace;
+}
+.progress-bar-wrap { height: 3px; background: var(–border); position: relative; flex-shrink: 0; }
+.progress-bar-fill { height: 100%; background: var(–orange); transition: width 0.5s; }
+
+/* Bottom nav */
+.bottom-nav {
+display: flex;
+background: var(–surface);
+border-top: 1px solid var(–border);
+flex-shrink: 0;
+z-index: 10;
+}
+.nav-btn {
+flex: 1;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 10px 0 14px;
+gap: 4px;
+cursor: pointer;
+border: none;
+background: none;
+font-family: ‘DM Sans’, sans-serif;
+color: var(–text-3);
+font-size: 11px;
+font-weight: 500;
+transition: color 0.15s;
+}
+.nav-btn.active { color: var(–orange); }
+.nav-btn .nav-icon { font-size: 22px; line-height: 1; }
+
+/* Content area */
+.content-area { flex: 1; overflow: hidden; position: relative; }
+.content-panel { position: absolute; inset: 0; overflow-y: auto; display: none; }
+.content-panel.active { display: block; }
+
+/* ── MAP PANEL ───────────────────────────── */
+#map-panel { padding: 0; }
+#map { width: 100%; height: calc(100% - 90px); z-index: 1; }
+.station-strip {
+height: 90px;
+background: var(–surface);
+border-top: 1px solid var(–border);
+display: flex;
+align-items: center;
+gap: 8px;
+padding: 0 12px;
+overflow-x: auto;
+-webkit-overflow-scrolling: touch;
+}
+.station-strip::-webkit-scrollbar { display: none; }
+.station-chip {
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 4px;
+flex-shrink: 0;
+width: 64px;
+cursor: pointer;
+padding: 6px 4px;
+border-radius: var(–radius-sm);
+transition: background 0.15s;
+}
+.station-chip:active { background: var(–bg); }
+.station-chip .chip-dot {
+width: 30px; height: 30px;
+border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 13px; font-weight: 600;
+border: 2px solid transparent;
+}
+.station-chip .chip-dot.done { background: var(–green); color: #fff; border-color: var(–green); }
+.station-chip .chip-dot.current { background: var(–orange); color: #fff; border-color: var(–orange); }
+.station-chip .chip-dot.locked { background: var(–border); color: var(–text-3); border-color: var(–border); }
+.station-chip .chip-label { font-size: 9px; color: var(–text-2); text-align: center; line-height: 1.2; }
+
+/* ── STATIONS LIST ───────────────────────── */
+#list-panel { padding: 16px; }
+.list-header { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(–text-3); margin-bottom: 12px; }
+.station-card {
+background: var(–surface);
+border-radius: var(–radius);
+border: 1px solid var(–border);
+margin-bottom: 10px;
+overflow: hidden;
+cursor: pointer;
+transition: transform 0.15s, box-shadow 0.15s;
+}
+.station-card:active { transform: scale(0.99); }
+.station-card.current { border-color: var(–orange); box-shadow: 0 0 0 1px var(–orange); }
+.station-card.done { opacity: 0.6; }
+.sc-header {
+display: flex;
+align-items: center;
+gap: 12px;
+padding: 14px 16px;
+}
+.sc-num {
+width: 36px; height: 36px;
+border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 14px; font-weight: 600;
+flex-shrink: 0;
+}
+.sc-num.done { background: var(–green); color: #fff; }
+.sc-num.current { background: var(–orange); color: #fff; }
+.sc-num.locked { background: var(–border); color: var(–text-3); }
+.sc-info { flex: 1; }
+.sc-name { font-size: 15px; font-weight: 500; }
+.sc-sub { font-size: 12px; color: var(–text-2); margin-top: 2px; }
+.sc-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 100px; }
+.sc-badge.done { background: var(–green-light); color: var(–green); }
+.sc-badge.current { background: var(–orange-light); color: var(–orange-dark); }
+
+/* ── CHALLENGE PANEL ─────────────────────── */
+#challenge-panel { padding: 16px; }
+.challenge-card {
+background: var(–surface);
+border-radius: var(–radius);
+border: 1px solid var(–border);
+padding: 20px;
+margin-bottom: 12px;
+}
+.challenge-tag {
+display: inline-flex; align-items: center; gap: 5px;
+font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+padding: 4px 10px; border-radius: 100px; margin-bottom: 12px;
+}
+.challenge-tag.riddle { background: #FFF3E0; color: #E65100; }
+.challenge-tag.fact { background: #E3F2FD; color: #1565C0; }
+.challenge-tag.photo { background: #FCE4EC; color: #880E4F; }
+.challenge-tag.game { background: var(–green-light); color: var(–green); }
+.challenge-q { font-size: 16px; font-weight: 500; line-height: 1.5; margin-bottom: 16px; }
+.challenge-options { display: flex; flex-direction: column; gap: 8px; }
+.opt-btn {
+background: var(–bg);
+border: 1.5px solid var(–border);
+border-radius: var(–radius-sm);
+padding: 13px 16px;
+font-size: 14px; font-weight: 500;
+font-family: ‘DM Sans’, sans-serif;
+color: var(–text);
+cursor: pointer;
+text-align: left;
+transition: all 0.15s;
+}
+.opt-btn:active { transform: scale(0.99); }
+.opt-btn.correct { background: var(–green-light); border-color: var(–green); color: var(–green); }
+.opt-btn.wrong { background: #FEE; border-color: #E57373; color: #C62828; }
+.opt-btn.disabled { pointer-events: none; opacity: 0.5; }
+.reveal-btn {
+background: none;
+border: 1.5px dashed var(–border);
+border-radius: var(–radius-sm);
+padding: 13px 16px;
+font-size: 14px; font-weight: 500;
+font-family: ‘DM Sans’, sans-serif;
+color: var(–text-2);
+cursor: pointer;
+width: 100%; text-align: center; margin-top: 8px;
+}
+.answer-reveal {
+background: var(–orange-light);
+border-radius: var(–radius-sm);
+padding: 12px 16px;
+font-size: 14px; color: var(–orange-dark);
+line-height: 1.5; margin-top: 8px;
+display: none;
+}
+.answer-reveal.show { display: block; }
+.fun-fact-text { font-size: 15px; line-height: 1.6; color: var(–text); }
+.photo-task { font-size: 14px; line-height: 1.5; color: var(–text-2); }
+
+/* Completion card */
+.complete-card {
+background: var(–green);
+border-radius: var(–radius);
+padding: 20px;
+color: #fff;
+text-align: center;
+margin-bottom: 12px;
+}
+.complete-card .big-emoji { font-size: 40px; margin-bottom: 8px; }
+.complete-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.complete-card p { font-size: 14px; opacity: 0.85; }
+
+/* next station btn */
+.next-station-btn {
+width: 100%;
+background: var(–orange);
+color: #fff;
+border: none;
+border-radius: var(–radius);
+padding: 16px;
+font-size: 16px; font-weight: 600;
+font-family: ‘DM Sans’, sans-serif;
+cursor: pointer;
+margin-top: 8px;
+transition: background 0.15s;
+}
+.next-station-btn:active { background: var(–orange-dark); }
+
+/* Leaflet popup custom */
+.leaflet-popup-content-wrapper {
+border-radius: 12px !important;
+box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+font-family: ‘DM Sans’, sans-serif !important;
+}
+.popup-inner { padding: 4px 2px; min-width: 150px; }
+.popup-num { font-size: 11px; font-weight: 600; color: var(–text-3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+.popup-name { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.popup-btn {
+background: var(–orange);
+color: #fff;
+border: none;
+border-radius: 8px;
+padding: 7px 14px;
+font-size: 13px; font-weight: 600;
+font-family: ‘DM Sans’, sans-serif;
+cursor: pointer;
+width: 100%;
+}
+
+/* confetti */
+.confetti-piece {
+position: fixed;
+width: 8px; height: 8px;
+border-radius: 2px;
+animation: confetti-fall 2s ease-in forwards;
+pointer-events: none;
+z-index: 9999;
+}
+@keyframes confetti-fall {
+0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+</style>
+
+</head>
+<body>
+
+<!-- SPLASH -->
+
+<div id="splash" class="screen">
+  <div class="splash-emoji">🗺️</div>
+  <div class="splash-title">Schnitzeljagd<br>Barcelona</div>
+  <div class="splash-sub">1. Mai 2025 · 9 Stations</div>
+  <button class="splash-btn" onclick="showScreen('namescreen')">Let's go!</button>
+</div>
+
+<!-- NAME SCREEN -->
+
+<div id="namescreen" class="screen hidden">
+  <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; gap:1.2rem;">
+    <div class="name-icon">👤</div>
+    <div class="name-title">What's your name?</div>
+    <div class="name-sub">Your name will appear on the scoreboard</div>
+    <input type="text" class="name-input" id="player-name-input" placeholder="Your name..." maxlength="20" />
+    <button class="btn-primary" id="start-btn" onclick="startGame()" disabled>Play →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+
+<div id="mainapp" class="screen hidden">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-player">
+      <div class="player-avatar" id="avatar-initials">?</div>
+      <div class="player-name" id="topbar-name">Spieler</div>
+    </div>
+    <div class="score-pill" id="score-display">0 points</div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+  </div>
+
+  <!-- Content -->
+
+  <div class="content-area">
+    <!-- MAP -->
+    <div class="content-panel active" id="map-panel">
+      <div id="map"></div>
+      <div class="station-strip" id="station-strip"></div>
+    </div>
+
+```
+<!-- LIST -->
+<div class="content-panel" id="list-panel">
+  <div class="list-header">Deine Stations</div>
+  <div id="station-list"></div>
+</div>
+
+<!-- CHALLENGES -->
+<div class="content-panel" id="challenge-panel">
+  <div id="challenge-content"></div>
+</div>
+```
+
+  </div>
+
+  <!-- Bottom nav -->
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-map" onclick="switchPanel('map')">
+      <span class="nav-icon">🗺️</span>Map
+    </button>
+    <button class="nav-btn" id="nav-list" onclick="switchPanel('list')">
+      <span class="nav-icon">📍</span>Stations
+    </button>
+    <button class="nav-btn" id="nav-challenge" onclick="switchPanel('challenge')">
+      <span class="nav-icon">❓</span>Challenges
+    </button>
+  </div>
+</div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const STATIONS = [
+  {
+    id: 1, name: "Mercat de Sant Antoni", sub: "Start · 10:00 Uhr",
+    lat: 41.3786, lng: 2.1621, emoji: "🏁",
+    challenges: [
+      {
+        type: "riddle", tag: "Challenges",
+        q: "Dieser Markt war fast 20 Jahre lang geschlossen. In welchem Jahr wurde er wieder eröffnet?",
+        options: ["2015", "2019", "2023", "2021"],
+        answer: 2, points: 2,
+        funfact: "Der Markt wurde 2009 geschlossen und erst 2023 wiedereröffnet — länger als jede Baustelle der Sagrada Família! Im Erdgeschoss wurde ein Supermarkt gebaut."
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Macht ein Gruppen-Selfie mit dem Markt-Eingang. Alle zeigen mit dem Daumen nach oben!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 2, name: "Fàbrica Moritz", sub: "Ronda de Sant Antoni 39",
+    lat: 41.3804, lng: 2.1628, emoji: "🍺",
+    challenges: [
+      {
+        type: "riddle", tag: "Challenges",
+        q: "Woher kam Louis Moritz, der Gründer der Brauerei?",
+        options: ["Bayern (Deutschland)", "Elsass (Frankreich)", "Katalonien", "Österreich"],
+        answer: 1, points: 2,
+        funfact: "Louis Moritz kam 1851 aus Pfaffenhofen im Elsass nach Barcelona — und gründete damit das älteste noch aktive Bier Spaniens! Das Gebäude wurde später vom Star-Architekten Jean Nouvel umgebaut."
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Alle stoßen ernst und feierlich an — als wäre es ein wichtiges Geschäftsmeeting. Kein Lächeln erlaubt!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 3, name: "MACBA / Keith Haring Mural", sub: "Bar Marsella nearby",
+    lat: 41.3831, lng: 2.1669, emoji: "🎨",
+    challenges: [
+      {
+        type: "riddle", tag: "Suchrätsel",
+        q: "Findet das rote Keith-Haring-Mural. Was steht darauf geschrieben? Was bedeutet es auf Deutsch?",
+        reveal: "'Todos juntos podemos parar el SIDA' = Gemeinsam können wir AIDS stoppen. Keith Haring malte es 1989 in nur 5 Stunden — ohne Vorentwurf — mit Acid House Musik im Hintergrund.",
+        points: 3
+      },
+      {
+        type: "fact", tag: "Fun Fact — Bar Marsella",
+        q: "Die Bar Marsella (Carrer de Sant Pau 65) ist Barcelonas älteste Bar, gegründet 1820. Welche Farbe hat das beliebteste Getränk?",
+        options: ["Rot (Rotwein)", "Gelb (Absinth)", "Orange (Aperol)", "Klar (Wasser)"],
+        answer: 1, points: 2,
+        funfact: "Bar Marsella hat seit 1820 geöffnet! Picasso und Hemingway sollen hier getrunken haben. Das Markenzeichen: gelber Absinth — manche Flaschen stehen seit Jahrzehnten im Regal."
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Imitiert eine Figur aus dem Keith-Haring-Mural — Arme hoch, Beine breit, wie ein tanzender Strichmännchen! Kinder machen vor!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 4, name: "Font de Canaletes", sub: "La Rambla",
+    lat: 41.3843, lng: 2.1726, emoji: "⛲",
+    challenges: [
+      {
+        type: "riddle", tag: "Challenges",
+        q: "Laut Tradition: Was passiert, wenn man aus dem Canaletes-Brunnen trinkt?",
+        options: ["Man hat einen Tag lang Glück", "Man kehrt immer nach Barcelona zurück", "Man wird Barça-Fan", "Man spricht plötzlich Katalanisch"],
+        answer: 1, points: 1,
+        funfact: "FC Barça-Fans feiern hier nach jedem Meistertitel. Der Brunnen steht seit 1892 hier — benannt nach den alten Wasserkanälen ('canaletes') die früher hierher führten."
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Alle trinken gleichzeitig aus dem Brunnen — Foto von oben!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 5, name: "Carrer Petritxol", sub: "Churros & heiße Schokolade",
+    lat: 41.3826, lng: 2.1741, emoji: "🥐",
+    challenges: [
+      {
+        type: "riddle", tag: "Debatte — 1 Point für bestes Argument",
+        q: "Wer hat die Churros erfunden? Team A: Spanische Schäfer in den Bergen (weil sie kein Brot backen konnten). Team B: Portugiesen brachten sie aus China. Wer überzeugt die Gruppe?",
+        reveal: "Beide Theorien sind real! 'Youtiao' in China sieht fast identisch aus. Der Name 'Churro' kommt wahrscheinlich von der 'Churra-Schaf'-Rasse, deren Hörner wie Churros aussehen.",
+        points: 1
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Haltet einen Churro wie einen Zeigestab und zeigt damit auf etwas Interessantes in der Straße!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 6, name: "Plaça Reial", sub: "Gaudís erste Arbeit + Vermut",
+    lat: 41.3803, lng: 2.1752, emoji: "🏛️",
+    challenges: [
+      {
+        type: "riddle", tag: "Suchrätsel",
+        q: "Findet die zwei Laternen neben dem Brunnen in der Mitte. Wie viele Arme hat jede Laterne? Und was ist oben drauf?",
+        options: ["4 Arme, Drachen", "6 Arme, geflügelter Helm + Schlangen", "8 Arme, Adler", "6 Arme, Löwe"],
+        answer: 1, points: 3,
+        funfact: "Das war Gaudís allererster Auftrag für Barcelona — er war erst 26 Jahre alt! Der Bürgermeister soll gesagt haben: 'Ich weiß nicht ob ich einem Genie oder einem Verrückten das Diplom gebe.' Der geflügelte Helm symbolisiert Merkur — Gott des Handels, passend für eine Handelsstadt."
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Forced Perspective! Jemand 'hält' eine der Laternen in der Hand — oder 'sitzt' auf dem Brunnen. Kreativster Gewinner bekommt Extrapunkte!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 7, name: "Monument a Colom", sub: "Kolumbus-Denkmal",
+    lat: 41.3760, lng: 2.1778, emoji: "🗽",
+    challenges: [
+      {
+        type: "riddle", tag: "Das schwierigste Challenges",
+        q: "Kolumbus entdeckte Amerika und steht hier auf dem Turm. In welche Richtung zeigt er mit dem Finger?",
+        options: ["Nach Westen — Richtung Amerika", "Nach Osten — Richtung Mittelmeer", "Nach Norden — Richtung Europa", "Nach Süden — Richtung Afrika"],
+        answer: 1, points: 3,
+        funfact: "Er zeigt NICHT nach Amerika (Westen), sondern ungefähr Richtung Mittelmeer/Algerien. Historisch völlig falsch! Vielleicht deutet er auf das Meer, von dem er aufbrach?"
+      },
+      {
+        type: "photo", tag: "Foto-Challenge",
+        q: "Alle imitieren Kolumbus — zeigt mit dem Finger in die 'falsche' Richtung und schaut dabei absolut überzeugt und ernst!",
+        funfact: null
+      },
+      {
+        type: "game", tag: "Kinder-Spiel",
+        q: "Kinder vs. Erwachsene: Wer zählt in 30 Sekunden am meisten Tauben? Los!",
+        funfact: null
+      }
+    ]
+  },
+  {
+    id: 8, name: "Carrer de la Mercè", sub: "Stille Post auf Katalanisch!",
+    lat: 41.3793, lng: 2.1790, emoji: "💬",
+    challenges: [
+      {
+        type: "game", tag: "Spiel — Stille Post",
+        q: "Stille Post auf Katalanisch! Flüstert dieses Wort durch die Gruppe:\n\n'ESCAMPAR LA BOIRA'\n\nDer letzte sagt es laut — und muss raten, was es bedeutet.",
+        reveal: "'Escampar la boira' bedeutet wörtlich: 'Den Nebel zerstreuen' — aber eigentlich bedeutet es 'Hau ab!' oder 'Verschwinde!'",
+        points: 1
+      },
+      {
+        type: "riddle", tag: "Fun Fact — Shakira & Piqué",
+        q: "Shakira und Piqué besaßen zusammen ein Restaurant in Barcelona. Was passierte damit nach ihrer Trennung 2022?",
+        options: ["Es wurde geschlossen", "Es wurde von einem Michelin-Koch übernommen", "Shakira behielt es alleine", "Es wurde ein Museum"],
+        answer: 1, points: 2,
+        funfact: "Das Blue Spot am Passeig de Joan de Borbó wurde nach der Trennung verkauft und heißt jetzt 'Azul Rooftop' — besetzt von einem Michelin-Sternekoch!"
+      }
+    ]
+  },
+  {
+    id: 9, name: "Palacio de Correos", sub: "Ziel! 🏆",
+    lat: 41.3784, lng: 2.1809, emoji: "📬",
+    challenges: [
+      {
+        type: "riddle", tag: "Abschluss-Challenges",
+        q: "Dieses prächtige Gebäude ist eigentlich... was?",
+        options: ["Ein Palast des Königs", "Ein Postamt", "Ein Stadtgericht", "Ein Museum"],
+        answer: 1, points: 1,
+        funfact: "Das Palacio de Correos ist eines der schönsten Postämter Europas, eingeweiht 1927! Schaut an der Fassade nach den allegorischen Figuren — sie symbolisieren Telegraphie und Navigation."
+      },
+      {
+        type: "photo", tag: "Abschluss-Ritual",
+        q: "Kauft eine Postkarte und schreibt euch selbst eine Nachricht — als Erinnerung, die Wochen später zu Hause ankommt! 📮\n\nGlückwunsch — ihr habt die Schnitzeljagd geschafft! 🎉",
+        funfact: null
+      }
+    ]
+  }
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let playerName = '';
+let score = 0;
+let currentStation = 0; // 0-indexed, unlocked up to this
+let stationProgress = new Array(STATIONS.length).fill(0); // challenges completed per station
+let map, markers = [];
+
+// ── SCREENS ───────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.toggle('hidden', s.id !== id);
+  });
+}
+
+document.getElementById('player-name-input').addEventListener('input', function() {
+  document.getElementById('start-btn').disabled = this.value.trim().length < 2;
+});
+document.getElementById('player-name-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && this.value.trim().length >= 2) startGame();
+});
+
+function startGame() {
+  playerName = document.getElementById('player-name-input').value.trim();
+  const initials = playerName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('avatar-initials').textContent = initials;
+  document.getElementById('topbar-name').textContent = playerName;
+  showScreen('mainapp');
+  initMap();
+  renderStationStrip();
+  renderStationList();
+  renderChallenges();
+  updateScoreUI();
+}
+
+// ── PANELS ────────────────────────────────────────────────────────────────────
+function switchPanel(name) {
+  ['map','list','challenge'].forEach(p => {
+    document.getElementById(p+'-panel').classList.toggle('active', p === name);
+    document.getElementById('nav-'+p).classList.toggle('active', p === name);
+  });
+  if (name === 'map' && map) map.invalidateSize();
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', {
+    center: [41.3810, 2.1720],
+    zoom: 15,
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // Draw route line
+  const coords = STATIONS.map(s => [s.lat, s.lng]);
+  L.polyline(coords, { color: '#E85D2F', weight: 3, opacity: 0.5, dashArray: '8 6' }).addTo(map);
+
+  STATIONS.forEach((st, i) => {
+    const isDone = i < currentStation;
+    const isCurrent = i === currentStation;
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:36px;height:36px;border-radius:50%;
+        background:${isDone ? '#2D7A4F' : isCurrent ? '#E85D2F' : '#9C9A95'};
+        border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);
+        display:flex;align-items:center;justify-content:center;
+        font-size:14px;font-weight:700;color:#fff;
+        font-family:'DM Sans',sans-serif;
+      ">${isDone ? '✓' : i+1}</div>`,
+      iconSize: [36,36],
+      iconAnchor: [18,18]
+    });
+
+    const marker = L.marker([st.lat, st.lng], { icon }).addTo(map);
+    marker.bindPopup(`
+      <div class="popup-inner">
+        <div class="popup-num">Station ${i+1}</div>
+        <div class="popup-name">${st.name}</div>
+        ${isCurrent ? `<button class="popup-btn" onclick="goToChallenge()">Open challenge →</button>` : ''}
+      </div>
+    `, { maxWidth: 200 });
+    markers.push(marker);
+  });
+}
+
+function refreshMapMarkers() {
+  markers.forEach((m, i) => {
+    const st = STATIONS[i];
+    const isDone = i < currentStation;
+    const isCurrent = i === currentStation;
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:36px;height:36px;border-radius:50%;
+        background:${isDone ? '#2D7A4F' : isCurrent ? '#E85D2F' : '#9C9A95'};
+        border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);
+        display:flex;align-items:center;justify-content:center;
+        font-size:14px;font-weight:700;color:#fff;
+        font-family:'DM Sans',sans-serif;
+      ">${isDone ? '✓' : i+1}</div>`,
+      iconSize: [36,36], iconAnchor: [18,18]
+    });
+    m.setIcon(icon);
+    m.setPopupContent(`
+      <div class="popup-inner">
+        <div class="popup-num">Station ${i+1}</div>
+        <div class="popup-name">${st.name}</div>
+        ${isCurrent ? `<button class="popup-btn" onclick="goToChallenge()">Open challenge →</button>` : ''}
+      </div>
+    `);
+  });
+}
+
+function goToChallenge() {
+  document.querySelectorAll('.leaflet-popup-close-button').forEach(b => b.click());
+  switchPanel('challenge');
+}
+
+function flyToStation(idx) {
+  if (!map) return;
+  map.flyTo([STATIONS[idx].lat, STATIONS[idx].lng], 17, { duration: 1 });
+  setTimeout(() => markers[idx].openPopup(), 1100);
+}
+
+// ── STATION STRIP ─────────────────────────────────────────────────────────────
+function renderStationStrip() {
+  const strip = document.getElementById('station-strip');
+  strip.innerHTML = STATIONS.map((st, i) => {
+    const isDone = i < currentStation;
+    const isCurrent = i === currentStation;
+    const cls = isDone ? 'done' : isCurrent ? 'current' : 'locked';
+    return `<div class="station-chip" onclick="flyToStation(${i})">
+      <div class="chip-dot ${cls}">${isDone ? '✓' : i+1}</div>
+      <div class="chip-label">${st.emoji}<br>${st.name.split(' ')[0]}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── STATION LIST ──────────────────────────────────────────────────────────────
+function renderStationList() {
+  const list = document.getElementById('station-list');
+  list.innerHTML = STATIONS.map((st, i) => {
+    const isDone = i < currentStation;
+    const isCurrent = i === currentStation;
+    const cls = isDone ? 'done' : isCurrent ? 'current' : 'locked';
+    const badge = isDone ? '<span class="sc-badge done">✓ Done</span>' :
+                  isCurrent ? '<span class="sc-badge current">Current</span>' : '';
+    return `<div class="station-card ${cls}" onclick="stationCardClick(${i})">
+      <div class="sc-header">
+        <div class="sc-num ${cls}">${isDone ? '✓' : i+1}</div>
+        <div class="sc-info">
+          <div class="sc-name">${st.emoji} ${st.name}</div>
+          <div class="sc-sub">${st.sub}</div>
+        </div>
+        ${badge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function stationCardClick(i) {
+  if (i === currentStation) {
+    switchPanel('challenge');
+  } else {
+    switchPanel('map');
+    flyToStation(i);
+  }
+}
+
+// ── CHALLENGES ────────────────────────────────────────────────────────────────
+function renderChallenges() {
+  const st = STATIONS[currentStation];
+  const content = document.getElementById('challenge-content');
+  if (!st) {
+    content.innerHTML = `<div class="complete-card"><div class="big-emoji">🏆</div><h3>Done!</h3><p>Congratulations, ${playerName}!<br>You completed all stations!</p></div>`;
+    return;
+  }
+
+  const completed = stationProgress[currentStation];
+  const challenges = st.challenges;
+
+  let html = `<div style="margin-bottom:16px;">
+    <div class="list-header">Station ${currentStation+1} of ${STATIONS.length}</div>
+    <div style="font-size:20px;font-weight:600;margin-bottom:4px;">${st.emoji} ${st.name}</div>
+    <div style="font-size:13px;color:var(--text-2);">${completed} of ${challenges.length} challenges done</div>
+  </div>`;
+
+  challenges.forEach((ch, ci) => {
+    const isDone = ci < completed;
+    html += renderChallenge(ch, ci, isDone);
+  });
+
+  if (completed >= challenges.length && currentStation < STATIONS.length - 1) {
+    html += `<button class="next-station-btn" onclick="advanceStation()">→ Next stop: ${STATIONS[currentStation+1].name}</button>`;
+  } else if (completed >= challenges.length && currentStation === STATIONS.length - 1) {
+    html += `<div class="complete-card"><div class="big-emoji">🎉</div><h3>All stations complete!</h3><p>You scored ${score} points, ${playerName}!</p></div>`;
+  }
+
+  content.innerHTML = html;
+}
+
+function renderChallenge(ch, ci, isDone) {
+  const tagClass = ch.type === 'photo' ? 'photo' : ch.type === 'game' ? 'game' : ch.type === 'fact' ? 'fact' : 'riddle';
+
+  let inner = `<div class="challenge-card" style="${isDone ? 'opacity:0.55;' : ''}">
+    <div class="challenge-tag ${tagClass}">${ch.tag}</div>
+    <div class="challenge-q">${ch.q.replace(/\n/g,'<br>')}</div>`;
+
+  if (ch.options) {
+    inner += `<div class="challenge-options">`;
+    ch.options.forEach((opt, oi) => {
+      const cls = isDone ? (oi === ch.answer ? 'correct disabled' : 'disabled') : '';
+      inner += `<button class="opt-btn ${cls}" onclick="answerOption(${ci},${oi},${ch.answer},${ch.points||1})">${opt}</button>`;
+    });
+    inner += `</div>`;
+    if (ch.funfact && !isDone) {
+      inner += `<div class="answer-reveal" id="fact-${ci}">${ch.funfact}</div>`;
+    }
+  } else if (ch.reveal) {
+    inner += isDone
+      ? `<div class="answer-reveal show">${ch.reveal}</div>`
+      : `<button class="reveal-btn" onclick="revealAnswer(${ci},${ch.points||1})">💡 Reveal answer (+${ch.points||1} point${ch.points!==1?'s':''})</button>
+         <div class="answer-reveal" id="fact-${ci}">${ch.reveal}</div>`;
+  } else {
+    // photo/game - just a done button
+    if (!isDone) {
+      inner += `<button class="reveal-btn" onclick="markDone(${ci})" style="background:var(--orange-light);border-color:var(--orange);color:var(--orange-dark);">✓ Mark as done</button>`;
+    }
+  }
+
+  if (ch.funfact && isDone && ch.options) {
+    inner += `<div class="answer-reveal show">${ch.funfact}</div>`;
+  }
+
+  inner += `</div>`;
+  return inner;
+}
+
+function answerOption(ci, chosen, correct, pts) {
+  if (ci !== stationProgress[currentStation]) return;
+  const btns = document.querySelectorAll('.challenge-options')[ci] ? 
+    document.querySelectorAll('.challenge-options')[ci].querySelectorAll('.opt-btn') : null;
+  
+  // fallback: find all option btn groups
+  const allGroups = document.querySelectorAll('.challenge-options');
+  const group = allGroups[ci];
+  if (!group) return;
+  const buttons = group.querySelectorAll('.opt-btn');
+
+  buttons.forEach((b, bi) => {
+    b.classList.add('disabled');
+    if (bi === correct) b.classList.add('correct');
+    else if (bi === chosen && chosen !== correct) b.classList.add('wrong');
+  });
+
+  if (chosen === correct) {
+    addScore(pts);
+    confetti();
+  }
+
+  const factEl = document.getElementById('fact-' + ci);
+  if (factEl) factEl.classList.add('show');
+
+  setTimeout(() => { completeChallenge(ci); }, 800);
+}
+
+function revealAnswer(ci, pts) {
+  addScore(pts);
+  const factEl = document.getElementById('fact-' + ci);
+  if (factEl) factEl.classList.add('show');
+  const btn = factEl ? factEl.previousElementSibling : null;
+  if (btn) btn.style.display = 'none';
+  setTimeout(() => { completeChallenge(ci); }, 600);
+}
+
+function markDone(ci) {
+  completeChallenge(ci);
+}
+
+function completeChallenge(ci) {
+  if (ci === stationProgress[currentStation]) {
+    stationProgress[currentStation]++;
+    setTimeout(() => renderChallenges(), 400);
+  }
+}
+
+function advanceStation() {
+  currentStation++;
+  renderStationStrip();
+  renderStationList();
+  refreshMapMarkers();
+  updateProgress();
+  renderChallenges();
+  // fly map to new station
+  if (map) setTimeout(() => flyToStation(currentStation), 200);
+  confetti();
+}
+
+// ── SCORE / UI ────────────────────────────────────────────────────────────────
+function addScore(pts) {
+  score += pts;
+  updateScoreUI();
+}
+
+function updateScoreUI() {
+  document.getElementById('score-display').textContent = score + ' point' + (score !== 1 ? 's' : '');
+  updateProgress();
+}
+
+function updateProgress() {
+  const pct = (currentStation / STATIONS.length) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+// ── CONFETTI ──────────────────────────────────────────────────────────────────
+function confetti() {
+  const colors = ['#E85D2F','#2D7A4F','#F7C36A','#5B9CF6','#E879A0'];
+  for (let i = 0; i < 20; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `left:${Math.random()*100}%;top:-10px;background:${colors[Math.floor(Math.random()*colors.length)]};animation-delay:${Math.random()*0.5}s;animation-duration:${1.5+Math.random()}s;transform:rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }
+}
+</script>
+
+</body>
+</html>
